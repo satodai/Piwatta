@@ -22,13 +22,9 @@
 
 - (id)transformedValue:(id)value
 {
-	//NSDate *date = value;
-	//return [date descriptionWithCalendarFormat:@"%y/%m/%d %H:%M" timeZone:nil locale:[[NSUserDefaults standardUserDefaults] dictionaryRepresentation]];
-	
 	NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
 	[formatter setDateFormat:@"yyyy/MM/dd HH:mm"];
 	return [formatter stringFromDate:value];
-	//return dateString;
 }
 
 @end

@@ -11,8 +11,45 @@
 
 #import <Cocoa/Cocoa.h>
 
+#define NOTIFICATION_NAME @"PwEditorThreadFinishEvent"
+
 #define MAX_DOCUMENT_COUNT	10
 #define MAX_BODY_LENGTH		3200
+
+#define UDKEY_PAGESTOLOAD		@"pagesToLoad"
+#define UDKEY_CHECKUPDATER		@"checkUpdater"
+#define UDKEY_OPENAFTERSUBMIT	@"openAfterSubmit"
+#define UDKEY_HANDLENAME		@"handleName"
+#define UDKEY_PASSWORD			@"password"
+#define UDKEY_RMAIL				@"rmail"
+#define UDKEY_TOPICUP			@"topicUp"
+#define UDKEY_ORDERFROMTOP		@"orderFromTop"
+#define UDKEY_TOPICFILTERS		@"topicFilters"
+
+
+#define CBKEY_DBNAME_LABEL	@"label"
+#define CBKEY_DBNAM_VALUE	@"value"
+
+
+#define CBKEY_TOPIC_KIJIGRP			@"kijiGrp"
+#define CBKEY_TOPIC_TITLE			@"title"
+#define CBKEY_TOPIC_AUTHOR			@"author"
+#define CBKEY_TOPIC_BODY			@"body"
+#define CBKEY_TOPIC_SUBMITTEDTIME	@"submittedTime"
+#define CBKEY_TOPIC_KIJICOUNT		@"kijiCount"
+
+
+#define CBKEY_APPSTATUS_LOADING			@"loading"
+#define CBKEY_APPSTATUS_CANADDPAGE		@"canAddPage";
+#define CBKEY_APPSTATUS_CANREMOVEPAGE	@"canremovePage"
+#define CBKEY_APPSTATUS_STATUSMESSAGE	@"statusMessage"
+#define CBKEY_APPSTATUS_CURRENTBYTE		@"currentByte"
+#define CBKEY_APPSTATUS_REMAINBYTE		@"remainByte"
+#define CBKEY_APPSTATUS_EXCEEDED		@"exceeded"
+#define CBKEY_APPSTATUS_DOCUMENTEDITED	@"documentEdited"
+#define CBKEY_APPSTATUS_FILENAME		@"fileName"
+
+
 
 /*----------------------------------------------------------------------*/
 // Error codes
@@ -36,5 +73,8 @@
 
 
 
-#define PAGES_TO_LOAD	@"pagesToLoad"
+
+
+
+
 #endif

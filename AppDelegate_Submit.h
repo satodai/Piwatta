@@ -1,4 +1,4 @@
-//
+﻿//
 //  AppDelegate_Submit.h
 //  PwEditor
 //
@@ -11,10 +11,9 @@
 
 @interface AppDelegate(Submit)
 
-- (IBAction)onNext:(id)sender;
 - (IBAction)onPrev:(id)sender;
+- (IBAction)onNext:(id)sender;
 - (IBAction)onCancel:(id)sender;
-
 
 - (void)switchPage:(NSInteger)page;
 

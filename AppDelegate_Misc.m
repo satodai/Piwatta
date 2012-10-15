@@ -94,41 +94,45 @@
 	[NSThread detachNewThreadSelector:@selector(loadTopicThread) toTarget:self withObject:nil];
 }
 
-- (void)loadTopicThread
-{
-	[[self.kijiArrayController content] removeAllObjects];
-	[[self.topicArrayController content] removeAllObjects];
-	
-	NSMutableDictionary * dbName = [[self.dbNameArrayController content] objectAtIndex:self.dbNameArrayController.selectionIndex];
-	NSString *dbNameValue = [dbName objectForKey:@"value"];
-	
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"loading"];
-	if (![self.pworld loadTopic:dbNameValue])
-		NSLog(@"errorCode = <%ld>", self.pworld.errorCode);
-	
-	
-	
-	if ([[self.topicArrayController content] count] > 0) {
-		[self.topicArrayController setSelectionIndex:0];	
-	}
-	//else {
-	//	[self setValue:[NSNumber numberWithInteger:-1] forKey:@"topicSelectionIndex"];
-	//}
-	
-
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"loading"];
-	//NSLog(@"%@", @"loadTopicThread is finished.");
-	//[NSThread exit];
-	
-	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"topic", @"loaded", nil];
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"PwEditorLoadFinishEvent" object:nil userInfo:userInfo];
-}
-
 - (void)loadKiji
 {
 	[NSThread detachNewThreadSelector:@selector(laodKijiThread) toTarget:self withObject:nil];
-	//[self laodKijiThread];
 }
+
+- (void)prePareSubmit:(BOOL)isSubmitToTopic
+{
+	[NSThread detachNewThreadSelector:@selecter(prepareSubmitThread) toTarget:self withObject:[NSNumber numberWithBool:isSubmitToTopic]];
+}
+
+- (void)submit:(BOOL)isSubmitToTopic
+{
+	[NSThread detachNewThreadSelector:@selecter(submitThread) toTarget:self withObject:[NSNumber numberWithBool:isSubmitToTopic]];
+}
+
+- (void)loadTopicThread
+{
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_LOADING];
+
+	[[self.kijiArrayController content] removeAllObjects];
+	[[self.topicArrayController content] removeAllObjects];
+	
+	NSInteger dbNameIndex = [self.dbNameArrayController selectionIndex];
+	NSMutableDictionary * dbName = [[self.dbNameArrayController content] objectAtIndex:dbNameIndex];
+	NSString *dbNameValue = [dbName objectForKey:CBKEY_DBNAMEVALUE];
+	
+	
+	BOOL result = [self.pworld loadTopic:dbNameValue];
+	
+	if ([[self.topicArrayController content] count] > 0)
+		[self.topicArrayController setSelectionIndex:0];	
+	
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_LOADING];
+	
+	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"loadTopicThread", @"threadName", nil];
+	[[NSNotificationCenter defaultCenter] postNotificationName:NOTIFICATION_NAME object:nil userInfo:userInfo];
+}
+
+
 
 - (void)laodKijiThread
 {

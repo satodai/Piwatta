@@ -1,4 +1,4 @@
-//
+﻿//
 //  AppDelegate.m
 //  PwEditor
 //
@@ -35,38 +35,40 @@
 	
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
+	// Thread終了通知登録
 	NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
-	[notificationCenter addObserver:self selector:@selector(OnLoadThreadEnd:) name:@"PwEditorLoadFinishEvent" object:nil];
+	[notificationCenter addObserver:self selector:@selector(OnThreadEnd:) name:NOTIFICATION_NAME object:nil];
 	
+	// 日付フォーマッター登録
 	DateFormatTransformer *transformaer = [[DateFormatTransformer alloc] init];
     [NSValueTransformer setValueTransformer:transformaer forName:@"DateFormatTransFormer"];
 	
-	NSUserDefaults * userDefaults = [NSUserDefaults standardUserDefaults];
-	NSInteger pagesToLoad = [userDefaults integerForKey:PAGES_TO_LOAD];
-	if (pagesToLoad == 0)
-		[userDefaults setInteger:3 forKey:PAGES_TO_LOAD];
+	// ユーザー設定初期値登録
+	NSString *userDefaultsValuesPath = [[NSBundle mainBundle] pathForResource:@"UserDefaults" ofType:@"plist"];
+	NSDictionary *userDefaultsValuesDict = [NSDictionary dictionaryWithContentsOfFile:userDefaultsValuesPath];
+	[[NSUserDefaults standardUserDefaults] registerDefaults:userDefaultsValuesDict];
+	
+	// アプリ状態初期値設定
+	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_LOADING];
+	[[_appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_CANADD_PAGE];
+	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_CANREMOVEPAGE];
+	[[_appStatusController content] setValue:@"" forKey:CBKEY_APPSTATUS_TABLEVIEWSTATUSMESSAGE];
+	[[_appStatusController content] setValue:[NSNumber numberWithInteger:0] forKey:CBKEY_APPSTATUS_CURRENTBYTE];
+	[[_appStatusController content] setValue:[NSNumber numberWithInteger:MAX_BODY_LENGTH] forKey:CBKEY_APPSTATUS_REMAINBYTE];
+	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_EXCEEDED];
+	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
+	[[_appStatusController content] setValue:@"名称未設定.pwe" forKey:CBKEY_APPSTATUS_FILENAME];
+	
 	
 	_pworld = [[PWorld alloc] initWithDbNameArray:_dbNameArrayController topicArray:_topicArrayController kijiArray:_kijiArrayController];
-
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"loading"];
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"canAddPage"];
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"canRemovePage"];
-	[[_appStatusController content] setValue:@"このトピックにまだ投稿はありません" forKey:@"kijiCount"];
-	[[_appStatusController content] setValue:[NSNumber numberWithInteger:0] forKey:@"currentByte"];
-	[[_appStatusController content] setValue:[NSNumber numberWithInteger:MAX_BODY_LENGTH] forKey:@"remainByte"];
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"exceeded"];
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"documentEdited"];
-	[[_appStatusController content] setValue:@"名称未設定" forKey:@"fileName"];
 	
+	//if (![_pworld loadDbName])
+	//	NSLog(@"loadDbName error = <%ld>", _pworld.errorCode);
 	
-	if (![_pworld loadDbName])
-		NSLog(@"loadDbName error = <%ld>", _pworld.errorCode);
-	
-	if ([[_dbNameArrayController content] count] > 0)
-		_dbNameArrayController.selectionIndex = 0;
+	//if ([[_dbNameArrayController content] count] > 0)
+	//	_dbNameArrayController.selectionIndex = 0;
 	
 	[self loadTopic];
-	
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender
@@ -96,15 +98,25 @@
 
 - (void) OnLoadThreadEnd:(NSNotification *)notification
 {
-	NSString *item = [[notification userInfo] objectForKey:@"loaded"];
-	NSLog(@"%@", item);
+	NSString *threadName = [[notification userInfo] objectForKey:@"threadName"];
 	
-	if ([item isEqualToString:@"topic"]) {
+	if ([item isEqualToString:@"laodTopicThread"]) {
 		[self loadKiji];
+		return;
 	}
-	else if ([item isEqualToString:@"kiji"]) {
-		NSString *s = [NSString stringWithFormat:@"%ld 件の投稿があります", 10];
-		[[_appStatusController content] setValue:s forKey:@"kijiCount"];
+	
+	if ([item isEqualToString:@"loadKijiThread"]) {
+		NSString *statusMessage;
+		
+		NSMutableDictionary *topic = [[_topicArrayController content] objectAtIndex:[_topicArrayController selectionIndex]];
+		NSInteger kijiCount = [topic valueForKey:CBKEY_TOPIC_KIJICOUNT];
+		
+		if (kijiCount == 0)
+			statusMessage = @"投稿はまだありません";
+		else
+			statusMsg = [NSString stringWithFormat:@"%ld 件の投稿があります", kijiCount];
+		
+		[[_appStatusController content] setValue:s forKey:CBKEY_APPSTATUS_STATUSMESSAGE];
 	}
 }
 
