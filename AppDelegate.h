@@ -16,14 +16,12 @@
 @property (assign) IBOutlet NSSegmentedControl *segmentedControl;
 @property (assign) IBOutlet NSWindow *submitWindow;
 
+@property (assign) IBOutlet NSArrayController *documents;
+@property (assign) IBOutlet NSArrayController *dbNames;
+@property (assign) IBOutlet NSArrayController *topics;
+@property (assign) IBOutlet NSArrayController *kijis;
 
-
-@property (assign) IBOutlet NSArrayController *documentArrayController;
-@property (assign) IBOutlet NSObjectController *appStatusController;
-@property (assign) IBOutlet NSArrayController *dbNameArrayController;
-@property (assign) IBOutlet NSArrayController *topicArrayController;
-@property (assign) IBOutlet NSArrayController *kijiArrayController;
-
+@property (assign) IBOutlet NSObjectController *appStatus;
 @property (assign) IBOutlet NSTabView *submitPanelTabView;
 
 

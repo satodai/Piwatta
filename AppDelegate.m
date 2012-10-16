@@ -18,11 +18,11 @@
 @synthesize textView = _textView;
 @synthesize segmentedControl = _segmentedControl;
 @synthesize submitWindow = _submitWindow;
-@synthesize documentArrayController = _documentArrayController;
+@synthesize documents = _documents;
+@synthesize dbNames = _dbNames;
+@synthesize topics = _topics;
+@synthesize kijis = _kijis;
 @synthesize appStatusController = _appStatusController;
-@synthesize dbNameArrayController = _dbNameArrayController;
-@synthesize topicArrayController = _topicArrayController;
-@synthesize kijiArrayController = _kijiArrayController;
 
 @synthesize submitPanelTabView = _submitPanelTabView;
 
@@ -60,13 +60,8 @@
 	[[_appStatusController content] setValue:@"名称未設定.pwe" forKey:CBKEY_APPSTATUS_FILENAME];
 	
 	
-	_pworld = [[PWorld alloc] initWithDbNameArray:_dbNameArrayController topicArray:_topicArrayController kijiArray:_kijiArrayController];
+	_pworld = [[PWorld alloc] initWithDbNameArray:_dbNames topicArray:_topics kijiArray:_kijis];
 	
-	//if (![_pworld loadDbName])
-	//	NSLog(@"loadDbName error = <%ld>", _pworld.errorCode);
-	
-	//if ([[_dbNameArrayController content] count] > 0)
-	//	_dbNameArrayController.selectionIndex = 0;
 	
 	[self loadTopic];
 }
@@ -79,7 +74,7 @@
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {
 	if ([_window isDocumentEdited]) {
-		[_documentArrayController commitEditing];
+		[_documents commitEditing];
 		
 		NSAlert *alert = [[NSAlert alloc] init];
 		[alert addButtonWithTitle:@"保存..."];
@@ -96,39 +91,43 @@
 	return NSTerminateNow;
 }
 
-- (void) OnLoadThreadEnd:(NSNotification *)notification
+- (void) OnThreadEnd:(NSNotification *)notification
 {
-	NSString *threadName = [[notification userInfo] objectForKey:@"threadName"];
+	NSString *threadName = [[notification userInfo] valueForKey:@"threadName"];
+	BOOL result = [[[notification userInfo] valueForKey:@"result"] boolValue];
 	
-	if ([item isEqualToString:@"laodTopicThread"]) {
+	if (!result) {
+		NSLog(@"読込エラーが発生しました。[%@],[%ld]", threadName, _pworld.errorCode);
+	}
+	
+	
+	if ([threadName isEqualToString:@"laodTopicThread"]) {
 		[self loadKiji];
 		return;
 	}
 	
-	if ([item isEqualToString:@"loadKijiThread"]) {
-		NSString *statusMessage;
+	if ([threadName isEqualToString:@"loadKijiThread"]) {
+		NSMutableDictionary *topic = [[_topics content] objectAtIndex:[_topics selectionIndex]];
+		NSInteger kijiCount = [[topic valueForKey:CBKEY_TOPIC_KIJICOUNT] integerValue];
 		
-		NSMutableDictionary *topic = [[_topicArrayController content] objectAtIndex:[_topicArrayController selectionIndex]];
-		NSInteger kijiCount = [topic valueForKey:CBKEY_TOPIC_KIJICOUNT];
-		
+		NSString *statusMsg;
 		if (kijiCount == 0)
-			statusMessage = @"投稿はまだありません";
+			statusMsg = @"投稿はまだありません";
 		else
 			statusMsg = [NSString stringWithFormat:@"%ld 件の投稿があります", kijiCount];
 		
-		[[_appStatusController content] setValue:s forKey:CBKEY_APPSTATUS_STATUSMESSAGE];
+		[[_appStatus content] setValue:statusMsg forKey:CBKEY_APPSTATUS_STATUSMESSAGE];
 	}
 }
 
 - (IBAction)onFileNew:(id)sender
 {
-	[[_documentArrayController content] removeAllObjects];
+	[[_documents content] removeAllObjects];
 	
-	NSMutableDictionary *document = [NSMutableDictionary dictionary];
-	[document setObject:@"new document" forKey:@"body"];
-	[_documentArrayController addObject:document];
+	NSMutableDictionary *document = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"", CBKEY_DOCUMENT_TITLE, @"new document created", CBKEY_DOCUMENT_BODY];
+	[_documents addObject:document];
 	
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"documentEdited"];
+	[[_appStatus content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
 	[self synchronizeSegmentedControl];
 	[self synchronizeCount];
 }
@@ -137,22 +136,21 @@
 {
 	NSOpenPanel *openPanel = [NSOpenPanel openPanel];
 	[openPanel beginSheetModalForWindow:self.window completionHandler:
-	 ^(NSInteger result) {
-		 if (result == NSFileHandlingPanelOKButton) {
-			 NSString *fileName = [openPanel filename];
-			 [[_appStatusController content] setValue:fileName forKey:@"fileName"];
-			 [_documentArrayController setContent:[NSKeyedUnarchiver unarchiveObjectWithFile:fileName]];
-			 [[_appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"documentEdited"];
-			 [self synchronizeSegmentedControl];
-			 [self synchronizeCount];
-		 }
-	 }
-	 ];
+		^(NSInteger result) {
+			 if (result == NSFileHandlingPanelOKButton) {
+				 NSString *fileName = [openPanel filename];
+				 [_documents setContent:[NSKeyedUnarchiver unarchiveObjectWithFile:fileName]];
+				 [[_appStatus content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
+				 [[_appStatus content] setValue:[NSString lastPathComponent:fileName] forKey:CBKEY_APPSTATUS_FILENAME];
+				 [self synchronizeSegmentedControl];
+				 [self synchronizeCount];
+			 }
+		}];
 }
 
 - (IBAction)onFileSave:(id)sender
 {
-	NSString *fileName = [[_appStatusController content] objectForKey:@"fileName"];
+	NSString *fileName = [[_appStatus content] objectForKey:CBKEY_APPSTATUS_FILENAME];
 	if ([fileName length] == 0)
 		[self onFileSaveAs:sender];
 	else
@@ -163,72 +161,58 @@
 {
 	NSSavePanel *savePanel = [NSSavePanel savePanel];
 	[savePanel setDirectory:[NSURL URLWithString:NSHomeDirectory()]];
-	[savePanel setNameFieldLabel:@"名前："];
-	[savePanel setNameFieldStringValue:[[_appStatusController content] valueForKey:@"fileName"]];
+	//[savePanel setNameFieldLabel:@"名前："];
+	[savePanel setNameFieldStringValue:[[_appStatus content] valueForKey:CBKEY_APPSTATUS_FILENAME]];
 	[savePanel beginSheetModalForWindow:self.window completionHandler:
-	 ^(NSInteger result) {
-		if (result == NSFileHandlingPanelOKButton) {
-			[self saveToFile:[savePanel filename]];
-		}
-	 }
-	 ];
+		^(NSInteger result) {
+			if (result == NSFileHandlingPanelOKButton) {
+				[self saveToFile:[savePanel filename]];
+				[[_appStatus content] setValue:[NSString lastPathComponent:fileName] forKey:CBKEY_APPSTATUS_FILENAME];
+			}
+		}];
 }
 
-- (IBAction)onPageSelected:(id)sender
-{
-	[self synchronizeCount];
-}
 
 - (IBAction)onAddPage:(id)sender
 {
-	if ([[_documentArrayController content] count] >= MAX_DOCUMENT_COUNT)
+	NSInteger documentCount =[ [_documents content] count];
+	if (documentCount > MAX_DOCUMENT_COUNT)
 		return;
 	
-	[_documentArrayController commitEditing];
+	[_documents commitEditing];
+	[_segmentedControl setSegmentCount:documentCount + 1];
 	
-	//NSString *title = [NSString string];
-	NSString *body = @"テキストを入力してください";
-	NSMutableDictionary *document = [NSMutableDictionary dictionaryWithObjectsAndKeys:body, @"body", nil];
+	NSMutableDictionary *document = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"", CBKEY_DOCUMENT_TITLE, [NSString stringWithFormat:@"new text for page %ld", documentCount + 1], CBKEY_DOCUMENT_BODY, nil];
 	
-	[_documentArrayController addObject:document];
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"documentEdited"];
+	[_documents addObject:document];
+	[[_appStatus content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
 	[self synchronizeSegmentedControl];
 	[self synchronizeCount];
 }
 
 - (IBAction)onRemovePage:(id)sender
 {
-	if ([[_documentArrayController content] count] == 1)
+	if ([[_documents content] count] == 1)
 		return;
 	
-	//NSInteger selectionIndex = [_documentArrayController selectionIndex];
-	NSMutableDictionary *currentDocument = [[_documentArrayController content] objectAtIndex:[_documentArrayController selectionIndex]];
-	//NSString *textIncurrentPage = [_textView string];
-	NSString *currentText = [currentDocument valueForKey:@"body"];
+	if ([documents selectionIndex] == 0)
+		return;
 	
-	
-	//NSArray *arrangedObjects = [_documents arrangedObjects];
-	NSMutableDictionary *prevDocument = [[_documentArrayController content] objectAtIndex:[_documentArrayController selectionIndex] - 1];
-	NSString *prevText = [prevDocument valueForKey:@"body"];
-	NSString *text = [prevText stringByAppendingString:currentText];
+	NSString *currentText = [_textView string];
+	NSMutableDictionary *prevDocument = [[_documents content] objectAtIndex:[_documents selectionIndex] - 1];
+	NSAttributedString *prevText = [prevDocument valueForKey:@"body"];
+	NSString *text = [NSString stringWithFormat:@"%@\n%@", [prevText string], currentText];
 	[prevDocument setValue:text forKey:@"body"];
 	
-	[_documentArrayController remove:nil];
+	[_documentArray remove:sender];
 	
-	[[_appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"documentEdited"];
+	[[_appStatus content] setValue:[NSNumber numberWithBool:YES] forKey:@"documentEdited"];
 	[self synchronizeSegmentedControl];
 	[self synchronizeCount];
+	[self.segmentedControl setSegmentCount:[[documents content] count]];
 }
 
-- (IBAction)dbNameSelected:(id)sender
-{
-	[self loadTopic];
-}
 
-- (IBAction)onTopicSelected:(id)sender
-{
-	[self loadKiji];
-}
 
 - (IBAction)onOpenTopic:(id)sender
 {
@@ -242,18 +226,39 @@
 	[[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:urlStr]];
 }
 
-- (IBAction)onPrevPage:(id)sender {
+- (IBAction)dbNameSelected:(id)sender
+{
+	[self loadTopic];
 }
 
-- (IBAction)onNextPage:(id)sender {
+- (IBAction)onTopicSelected:(id)sender
+{
+	[self loadKiji];
 }
 
-- (IBAction)onReload:(id)sender {
+- (IBAction)onDocumentSelected:(id)sender
+{
+	[self synchronizeCount];
+}
+
+- (IBAction)onPrevPage:(id)sender
+{
+	[self loadPrevKiji];
+}
+
+- (IBAction)onNextPage:(id)sender
+{
+	[self loadNextKiji];
+}
+
+- (IBAction)onReload:(id)sender
+{
+	[self loadKiji];
 }
 
 - (IBAction)onSubmit:(id)sender
 {
-	[NSApp beginSheet:_submitWindow modalForWindow:_window modalDelegate:self didEndSelector:@selector(submitSheetDidEnd:returnCode:contextInfo:) contextInfo:nil];
+	[self submit];
 }
 
 

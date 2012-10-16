@@ -12,57 +12,82 @@
 
 @implementation AppDelegate(Misc)
 
+- (BOOL)showSaveAsPanel
+{
+	NSSavePanel *savePanel = [NSSavePanel savePanel];
+	[savePanel setDirectory:[self.appStatus valueForKey:CBKEY_APPSTATUS_DIRECTORYNAME]];
+	//[savePanel setNameFieldLabel:@"名前："];
+	[savePanel setNameFieldStringValue:[[self.appStatus content] valueForKey:CBKEY_APPSTATUS_FILENAME]];
+		[savePanel beginSheetModalForWindow:self.window completionHandler:
+		 ^(NSInteger result) {
+			 if (result == NSFileHandlingPanelOKButton) {
+				NSString *fullPath = [savePanel fileName];
+				NSString fileName = [fullPath lastPathComponet];
+				[self.appStatus setValue:fileName forKey:CBKEY_APPSTATUS_FILENAME];
+				NSRange range = [fullPath rangeOfString:fileName];
+				if (range.location != NSNotFound) {
+					NSString directoryName = [fullPath substringToIndex:range.location];
+					[self.appStatus setValue:directoryName forKey:CBKEY_APPSTATUS_DIRECTORYNAME];
+				}
+				return YES;
+			 }
+		}];
+	
+	return NO;
+}
+
 - (void)synchronizeSegmentedControl
 {
-	NSInteger documentCount = [[self.documentArrayController content] count];
+	NSInteger documentCount = [[self.documents content] count];
+	[self.segmentedControl setSegmentCount:documentCount];
 	
 	NSInteger width = [self.segmentedControl widthForSegment:0];
-	[self.segmentedControl setSegmentCount:documentCount];
-	for (NSInteger i = 0; i < documentCount; i++) {
+	NSInteger count = [self.segmentedControl segmentCount];
+	for (NSInteger i = 0; i < count; i++) {
 		[self.segmentedControl setWidth:width forSegment:i];
 		[self.segmentedControl setLabel:[NSString stringWithFormat:@"%ld", i + 1] forSegment:i];
 	}
 	
 	[self.segmentedControl sizeToFit];
-	[self.segmentedControl setSelectedSegment:[self.documentArrayController selectionIndex]];
 	
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:(documentCount < MAX_DOCUMENT_COUNT) ? YES : NO] forKey:@"canAddPage"];
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:(documentCount > 1) ? YES : NO] forKey:@"canRemovePage"];
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:(documentCount < MAX_DOCUMENT_COUNT) ? YES : NO] forKey:CBKEY_APPSTATUS_CANADDPAGE];
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:(documentCount > 1) ? YES : NO] forKey:CBKEY_APPSTATUS_CANREMOVEPAGE];
 }
 
 - (void)synchronizeCount
 {
 	NSInteger count = [[self.textView string] pweByteCount];
-	NSNumber *currentByte = [NSNumber numberWithInteger:count];
-	NSNumber *remainByte = [NSNumber numberWithInteger:MAX_BODY_LENGTH - count];
 	BOOL exceeded = ([remainByte integerValue] < 0) ? YES : NO;
-	//NSLog(@"totalByte=<%ld>", [totalByte integerValue]);
-	//NSLog(@"remailByte=<%ld>", [remainByte integerValue]);
-	//NSLog(@"textExceeded=<%@>", textExceeded ? @"YES" : @"NO");
-	[[self.appStatusController content] setValue:currentByte forKey:@"currentByte"];
-	[[self.appStatusController content] setValue:remainByte forKey:@"remainByte"];
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:exceeded] forKey:@"exceeded"];
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"documentEdited"];
+	[[self.appStatusController content] setValue:[NSNumber numberWithInteger:count] forKey:CBKEY_APPSTATUS_CURRENTBYTE];
+	[[self.appStatusController content] setValue:[NSNumber numberWithInteger:MAX_BODY_LENGTH - count] forKey:CBKEY_APPSTATUS_REMAINBYTE];
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:exceeded] forKey:CBKEY_APPSTATUS_EXCEEDED];
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
 }
 
-- (void)saveWarningAlertDidEnd:(NSAlert *)alert returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo;
+- (void)showSubmitSheet:(NSWindow *)window
+{
+	[NSApp beginSheet:self.submitSheet modalForWindow:window modalDelegate:self didEndSelector:@selector(submitSheetDidEnd:returnCode:contextInfo:) contextInfo: nil];
+}
+
+- (IBAction)closeSubmitSheet:(id)sender
+{
+    [NSApp endSheet:self.submitSheet];
+}
+
+
+- (void)appFinishAlertSheetDidEnd:(NSAlert *)alert returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo;
 {
 	[[alert window] orderOut:self];
 	
 	switch (returnCode) {
 		case NSAlertFirstButtonReturn:
 			NSLog(@"NSAlertFirstButtonReturn");
-			NSSavePanel *savePanel = [NSSavePanel savePanel];
-			[savePanel setDirectory:[NSURL URLWithString:NSHomeDirectory()]];
-			[savePanel setNameFieldLabel:@"名前："];
-			[savePanel setNameFieldStringValue:[[self.appStatusController content] objectForKey:@"fileName"]];
-			[savePanel beginSheetModalForWindow:self.window completionHandler:
-			 ^(NSInteger result) {
-				 if (result == NSFileHandlingPanelOKButton) {
-					 [self saveToFile:[savePanel filename]];
-					 [NSApp terminate:self];
-				 }
-			 }];
+			if ([self showSaveAsPanel]) {
+				NSString directoryName = [self.appStatus valueForKey:CBKEY_APPSTATUS_DIRECTORYNAME];
+				NSString *fullPath = [directoryName stringByAppendingPathComponent:[self.appStatus valueForKey:CBKEY_APPSTATUS_FILENAME]];
+				[self saveToFile:fullPath];
+				[NSApp terminate:self];
+			}
 			break;
 			
 		case NSAlertSecondButtonReturn:
@@ -71,7 +96,7 @@
 			
 		case NSAlertThirdButtonReturn:
 			NSLog(@"NSAlertThirdButtonReturn");
-			[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"documentEdited"];
+			[[self.appStatus content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_DOCUMENTEDITED];
 			[NSApp terminate:self];
 			break;
 	}
@@ -79,7 +104,7 @@
 
 - (void)submitSheetDidEnd:(NSWindow *)sheet returnCode:(NSInteger)returnCode contextInfo:(void *)contextInfo
 {
-	[sheet orderOut:nil];
+	[sheet orderOut:self];
 }
 
 - (void)saveToFile:(NSString *)fileName
@@ -91,12 +116,27 @@
 
 - (void)loadTopic
 {
-	[NSThread detachNewThreadSelector:@selector(loadTopicThread) toTarget:self withObject:nil];
+	[NSThread detachNewThreadSelector:@selector(loadTopicThread:) toTarget:self withObject:nil];
 }
 
 - (void)loadKiji
 {
-	[NSThread detachNewThreadSelector:@selector(laodKijiThread) toTarget:self withObject:nil];
+	[NSThread detachNewThreadSelector:@selector(laodKijiThread:) toTarget:self withObject:[NSNumber numberWithInteger:0]];
+}
+
+- (void)loadPrevKiji
+{
+	[NSThread detachNewThreadSelector:@selector(laodKijiThread:) toTarget:self withObject:[NSNumber numberWithInteger:-1]];
+}
+
+- (void)loadNextKiji
+{
+	[NSThread detachNewThreadSelector:@selector(laodKijiThread:) toTarget:self withObject:[NSNumber numberWithInteger:1]];
+}
+
+- (void)submit
+{
+	[NSApp beginSheet:_submitWindow modalForWindow:_window modalDelegate:self didEndSelector:@selector(submitSheetDidEnd:returnCode:contextInfo:) contextInfo:nil];
 }
 
 - (void)prePareSubmit:(BOOL)isSubmitToTopic
@@ -106,55 +146,68 @@
 
 - (void)submit:(BOOL)isSubmitToTopic
 {
-	[NSThread detachNewThreadSelector:@selecter(submitThread) toTarget:self withObject:[NSNumber numberWithBool:isSubmitToTopic]];
+	
+	//[NSThread detachNewThreadSelector:@selecter(submitThread) toTarget:self withObject:[NSNumber numberWithBool:isSubmitToTopic]];
 }
 
-- (void)loadTopicThread
+- (void)loadTopicThread:(id)param
 {
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_LOADING];
+	[[self.appStatus content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_LOADING];
 
-	[[self.kijiArrayController content] removeAllObjects];
-	[[self.topicArrayController content] removeAllObjects];
+	[[self.kijis content] removeAllObjects];
+	[[self.topics content] removeAllObjects];
 	
-	NSInteger dbNameIndex = [self.dbNameArrayController selectionIndex];
-	NSMutableDictionary * dbName = [[self.dbNameArrayController content] objectAtIndex:dbNameIndex];
-	NSString *dbNameValue = [dbName objectForKey:CBKEY_DBNAMEVALUE];
+	NSInteger index = [self.dbNames selectionIndex];
+	NSMutableDictionary * dbName = [[self.dbNameArrayController content] objectAtIndex:index];
+	NSString *dbNameValue = [dbName objectForKey:CBKEY_DBNAME_VALUE];
 	
 	
 	BOOL result = [self.pworld loadTopic:dbNameValue];
 	
-	if ([[self.topicArrayController content] count] > 0)
-		[self.topicArrayController setSelectionIndex:0];	
+	if ([[self.topics content] count] > 0)
+		[self.topics setSelectionIndex:0];
 	
 	[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_LOADING];
 	
-	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"loadTopicThread", @"threadName", nil];
+	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"loadTopicThread", @"threadName", [NSNumber numberWithBool:result], @"result", nil];
 	[[NSNotificationCenter defaultCenter] postNotificationName:NOTIFICATION_NAME object:nil userInfo:userInfo];
 }
 
-
-
-- (void)laodKijiThread
+- (void)laodKijiThread:(id)param
 {
-	[[self.kijiArrayController content] removeAllObjects];
+	[[self.kijis content] removeAllObjects];
 	
 	NSMutableDictionary *dbName = [[self.dbNameArrayController content] objectAtIndex:self.dbNameArrayController.selectionIndex];
-	NSString *dbNameValue = [dbName objectForKey:@"value"];
+	NSString *dbNameValue = [dbName objectForKey:CBKEY_DBNAME_VALUE];
 	
 	NSMutableDictionary *topic = [[self.topicArrayController content] objectAtIndex:self.topicArrayController.selectionIndex];
-	NSString *kijiGrp = [topic objectForKey:@"kijiGrp"];
+	NSString *kijiGrp = [topic objectForKey:CBKEY_TOPIC_KIJIGRP];
 	
 	
 	
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:YES] forKey:@"loading"];
+	[[self.appStatus content] setValue:[NSNumber numberWithBool:YES] forKey:CBKEY_APPSTATUS_LOADING];
 	
+	BOOL result = NO;
+	NSInteger number = [param integerValue];
+	switch (number) {
+		case -1:
+			result = [self.pworld loadPreviousKiji:dbNameValue kijiGrp:kijiGrp];
+			break;
+		case 0:
+			result = [self.pworld loadKiji:dbNameValue kijiGrp:kijiGrp pageNumber:1];
+			break;
+		case 1:
+			result = [self.pworld loadNextKiji:dbNameValue kijiGrp:kijiGrp];
+			break;
+	}
 	
-	[self.pworld loadKiji:dbNameValue kijiGrp:kijiGrp pageNumber:1];
+	if ([[self.kijis content] count] > 0)
+		[self.kijis setSelectionIndex:0];
 	
-	[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:@"loading"];
+	[[self.appStatusController content] setValue:[NSNumber numberWithBool:NO] forKey:CBKEY_APPSTATUS_LOADING];
 	
-	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"kiji", @"loaded", nil];
-	[[NSNotificationCenter defaultCenter] postNotificationName:@"PwEditorLoadFinishEvent" object:nil userInfo:userInfo];
+	NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithObjectsAndKeys:@"loadKijiThread", @"threadName", [NSNumber numberWithBool:result], @"result", nil];
+	[[NSNotificationCenter defaultCenter] postNotificationName:NOTIFICATION_NAME object:nil userInfo:userInfo];
 }
 
 

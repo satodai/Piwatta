@@ -15,13 +15,14 @@
 
 @property (assign) NSInteger errorCode;
 @property (assign) BOOL cancelFlag;
+@property (assign) NSInteger prevPageNumber;
+@property (assign) NSInteger nextPageNumber;
+@property (assign) BOOL canLoadPrevPage;
+@property (assign) BOOL canLoadNextPage;
 @property (assign) NSArrayController *dbNames;
 @property (assign) NSArrayController *topics;
 @property (assign) NSArrayController *kijis;
 
-@property (assign) DbNameManager *dbNameManager;
-@property (assign) TopicManager *topicManager;
-@property (assign) KijiManager *kijiManager;
 
 - (id)initWithDbNameArray:(NSArrayController *)dbNames topicArray:(NSArrayController *)topics kijiArray:(NSArrayController *)kijis;
 

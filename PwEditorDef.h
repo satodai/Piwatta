@@ -39,6 +39,9 @@
 #define CBKEY_TOPIC_KIJICOUNT		@"kijiCount"
 
 
+#define CBKEY_DOCUMENT_TITLE	@"title"
+#define CBKEY_DOCUMENT_BODY		@"body"
+
 #define CBKEY_APPSTATUS_LOADING			@"loading"
 #define CBKEY_APPSTATUS_CANADDPAGE		@"canAddPage";
 #define CBKEY_APPSTATUS_CANREMOVEPAGE	@"canremovePage"
@@ -47,6 +50,7 @@
 #define CBKEY_APPSTATUS_REMAINBYTE		@"remainByte"
 #define CBKEY_APPSTATUS_EXCEEDED		@"exceeded"
 #define CBKEY_APPSTATUS_DOCUMENTEDITED	@"documentEdited"
+#define CBKEY_APPSTATUS_DIRECTORYNAME	@"directoryName"
 #define CBKEY_APPSTATUS_FILENAME		@"fileName"
 
 
